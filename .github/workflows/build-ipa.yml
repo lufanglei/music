@@ -18,7 +18,7 @@ on:
           - Debug
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -64,3 +64,21 @@ jobs:
           path: dist/*.ipa
           if-no-files-found: error
           retention-days: 30
+
+      # 同时发布成 Release 资产：公开仓库的 Release 文件无需登录即可直接下载，
+      # 固定 tag 让下载地址长期不变，后续构建用 --clobber 覆盖同名文件。
+      - name: Publish .ipa to Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="ipa-latest"
+          IPA=$(find dist -name '*.ipa' -type f | head -n 1)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$IPA" --clobber
+          else
+            gh release create "$TAG" "$IPA" \
+              --title "LX Music iOS (unsigned .ipa)" \
+              --notes "Automated unsigned build from ${GITHUB_SHA}. Resign with Sideloadly / AltStore / a Developer Team before installing on an iPhone." \
+              --target "$GITHUB_SHA"
+          fi
+          echo "Download: https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$(basename "$IPA")"
