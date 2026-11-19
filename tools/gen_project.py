@@ -295,7 +295,7 @@ def build():
         "IPHONEOS_DEPLOYMENT_TARGET = 16.0;",
         "LD_RUNPATH_SEARCH_PATHS = (\"$(inherited)\", \"@executable_path/Frameworks\");",
         "MARKETING_VERSION = 1.0.0;",
-        "PRODUCT_BUNDLE_IDENTIFIER = com.lxmusic.ios.player;",
+        "PRODUCT_BUNDLE_IDENTIFIER = com.lufanglei.lxmusic;",
         "PRODUCT_NAME = \"$(TARGET_NAME)\";",
         "SWIFT_EMIT_LOC_STRINGS = YES;",
         "SWIFT_STRICT_CONCURRENCY = minimal;",

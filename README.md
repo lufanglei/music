@@ -17,7 +17,7 @@
 1. 交付时这台 Mac **只有 Command Line Tools，没有 Xcode、没有 iOS SDK、钥匙串里 0 个签名证书**，因此本机无法编译 arm64 iOS 二进制，也无法产出可安装的包。硬凑一个 zip 改名成 `.ipa` 是假货，不做。
 2. iOS App 必须经 Apple 签名才能装进 iPhone，签名需要**你自己的** Apple ID / 证书。任何第三方都无法替你产出「不需要你参与就能装进你手机」的包——这是 iOS 机制，不是工程问题。
 
-好消息是：**这台 Mac 还有 179 GB 可用空间，装 Xcode 完全没问题**；更省事的是让云端 macOS 构建机替你编译。两条路都已在工程里配好，第三节分别给出步骤。
+好消息是：**云端 macOS 构建机已经把这个工程真实编译成功，并产出了 .ipa** —— 本机文件在 `dist/LXMusic-unsigned-Release.ipa`（553 KB，arm64、未签名），固定下载地址见第三节。所以现在其实**不必再装 Xcode**：拿这个包用侧载工具签名即可。若仍想在本机编译，第三节路径 B 也给出了命令（这台 Mac 还有 179 GB 可用空间，装得下）。
 
 ---
 
@@ -126,6 +126,16 @@ LXMusic-iOS/
 
 > 免费账号的 macOS runner 在私有仓库按分钟计费（公开仓库免费），本工程编译通常只需几分钟。Artifact 默认保留 30 天，需登录 GitHub 下载。
 
+### 固定下载地址（推荐，无需登录）
+
+工作流除了上传 Artifact，还会用 `gh release` 把 .ipa 发布到 tag `ipa-latest`，后续构建用 `--clobber` 覆盖同名文件，地址长期不变：
+
+```
+https://github.com/lufanglei/music/releases/download/ipa-latest/LXMusic-unsigned-Release.ipa
+```
+
+也可以打开仓库的 **Releases** 页手动下载。本机副本在 `dist/LXMusic-unsigned-Release.ipa`（因每次构建会覆盖同名资产，SHA256 会变化，需要时自行执行 `shasum -a 256` 校验）。
+
 ### 路径 B：本机装好 Xcode 后一条命令
 
 从 Mac App Store 安装 Xcode（首次打开需同意许可并装完组件），然后：
@@ -157,6 +167,24 @@ bash tools/build_ipa.sh --team ABCDE12345    # 已签名 .ipa（需开发者 Tea
 
 Sideloadly 用法：Mac 或 Windows 安装 → 数据线连 iPhone → 拖入 `.ipa` → 填 Apple ID（建议用小号）→ Start。装完在 iPhone **设置 → 通用 → VPN 与设备管理** 里信任该开发者。
 
+#### 侧载报错排查
+
+**`Bundle identifier unavailable: An invalid value '...' was provided for the parameter 'appIdName'`**
+
+Sideloadly / AltStore 在 Apple 后台创建 App ID 时，会把 `Info.plist` 的 `CFBundleDisplayName` 当作 `appIdName` 提交，而 Apple 只接受 ASCII（字母、数字、空格、连字符、下划线、句点）。**中文显示名会直接被拒**——这就是首版包报错的原因。
+
+现已改为全 ASCII 三件套，可直接侧载：
+
+| 字段 | 值 |
+| --- | --- |
+| `CFBundleDisplayName` | `LX Music` |
+| `CFBundleName` | `LXMusic` |
+| `CFBundleIdentifier` | `com.lufanglei.lxmusic` |
+
+如果确实想要中文图标名，正确做法是保持 `CFBundleDisplayName` 为 ASCII，另外用 `zh-CN.lproj/InfoPlist.strings` 做本地化；不要把中文直接写进 `CFBundleDisplayName`。
+
+其他常见报错：`The maximum number of App IDs has been reached` 是免费账号的 App ID 数量上限，换一个 Bundle ID 或清理旧 App ID 后重试；`bundle identifier is unavailable` 也可能是该 ID 已被别的账号注册，同样换 ID 即可（`build_ipa.sh --bundle-id` 或改 `gen_project.py` 后重跑）。
+
 ---
 
 ## 四、用 Xcode 直接装到 iPhone（不经过 .ipa）
@@ -174,7 +202,7 @@ Sideloadly 用法：Mac 或 Windows 安装 → 数据线连 iPhone → 拖入 `.
 1. 双击 `LXMusic.xcodeproj` 用 Xcode 打开。
 2. 左侧导航器选中蓝色工程图标 → 中间选 **TARGETS → LXMusic** → **Signing & Capabilities**。
 3. 勾选 **Automatically manage signing**；在 **Team** 下拉里选你的 Apple ID。若列表为空：Xcode → Settings… → Accounts → 左下角 `+` → 添加 Apple ID。
-4. **改 Bundle Identifier**：默认 `com.lxmusic.ios.player` 可能已被占用，改成全局唯一的值，例如 `com.<你的名字>.lxmusic`。
+4. **Bundle Identifier** 现为 `com.lufanglei.lxmusic`（全局唯一、全 ASCII）。若你的 Apple 账号下已注册过这个 ID，改成别的值即可，例如 `com.<你的名字>.lxmusic`。
 5. 用数据线连接 iPhone，解锁，弹窗点「信任此电脑」。
 6. Xcode 顶部运行目标从模拟器切到**你的 iPhone**，点 ▶（或 `⌘R`）。
 7. 首次安装后打开 App 若提示「不受信任的开发者」：
@@ -185,7 +213,7 @@ Sideloadly 用法：Mac 或 Windows 安装 → 数据线连 iPhone → 拖入 `.
 
 ### 如果编译报错
 
-本机没有 iOS SDK，只做了语法解析和一次受限制的跨文件类型检查（macOS SDK）。若 Xcode 报少量适配错误，通常是这几类：
+CI 首轮编译曾因 `SourceManager.swift:249-250` 把 `String?` / `nil` 赋给非 optional 的 `String` 而失败，已修复（commit `596f8e3`），此后 CI 全绿。本机仍没有 iOS SDK，只做了语法解析和一次受限制的跨文件类型检查（macOS SDK）。若本地 Xcode 报少量适配错误，通常是这几类：
 
 - `JSValue.setObject(block, forKeyedSubscript:)` 提示类型不符 → 把该 block 改成 `unsafeBitCast(block, to: AnyObject.self)` 再传入（`ScriptEngine.installNativeBridge` 里集中处理）。
 - SwiftUI 修饰符报「only available in iOS xx」→ 把 `IPHONEOS_DEPLOYMENT_TARGET` 提到对应版本，或换成等价旧 API。
@@ -290,6 +318,8 @@ send(EVENT_NAMES.inited, {
 
 ### 已验证
 
+- **iOS 真机编译与链接已通过**：GitHub Actions（`macos-15` / Xcode 16.4 / iPhoneOS 18.5 SDK）完整构建成功，`LXMusic` 可执行文件为 `Mach-O 64-bit executable arm64`
+- **.ipa 包结构已校验**：标准 `Payload/LXMusic.app/`，含 `Info.plist`、`LXMusic`、`Assets.car`、`LXPrelude.js`、`DemoSource.js`、`AppIcon*.png`；显示名 `LX Music`、Bundle ID `com.lufanglei.lxmusic`，均为 ASCII（侧载工具创建 App ID 不会报 `appIdName` 非法）
 - 21 个 Swift 文件全部通过 `swiftc -frontend -parse` 语法解析
 - 跨文件 `swiftc -typecheck`（macOS SDK）：仅报 `no such module 'UIKit'`（iOS 专属模块，属预期假阳性），在可解析范围内未发现跨文件引用或类型错误
 - `project.pbxproj` 通过 `plutil -lint`，76 个对象无悬空引用，21 个源文件全部进入 Sources 阶段，资源与 3 个系统框架齐全
@@ -301,7 +331,8 @@ send(EVENT_NAMES.inited, {
 
 ### 未验证 / 已知限制
 
-- **没有真机编译、链接和模拟器运行**（本机无 Xcode / iOS SDK）。这是当前交付最主要的残留风险；按第三节路径 A 跑一次 CI 即可完成真实编译并拿到错误日志。
+- **未在 iPhone 真机安装运行、未跑模拟器**：编译与链接已在 CI 通过，但运行时行为（音源脚本执行、后台播放、锁屏控制、音频中断恢复）仍需真机验证。这是当前交付最主要的残留风险。
+- 本机仍无 Xcode / iOS SDK，无法本地编译；需要本机编译请先装 Xcode（路径 B）。
 - CI 与本机脚本产出的是**未签名** .ipa，必须经侧载工具或你自己的证书重签名才能安装。
 - 未内置桌面版 `musicSdk` 里 kw/kg/tx/wy/mg 的搜索接口：那些接口带平台私有加密签名、变动频繁且涉及版权合规，不适合原样搬进一个未签名的本地工程。需要的话请通过「自定义 HTTP 搜索接口」指向你自建的服务，或自行在 `SearchProviders.swift` 增加 Provider。
 - 未实现下载、多端数据同步、桌面歌词、音效均衡器、歌单/排行榜详情页。
