@@ -1,0 +1,66 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Compile and package .ipa
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Xcode toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+          swift --version
+
+      - name: Build unsigned .ipa
+        run: |
+          bash tools/build_ipa.sh \
+            --unsigned \
+            --configuration "${{ github.event.inputs.configuration || 'Release' }}"
+
+      - name: Inspect package
+        run: |
+          IPA=$(find dist -name '*.ipa' -type f | head -n 1)
+          echo "IPA=$IPA"
+          unzip -Z1 "$IPA" | head -20
+          test -n "$(unzip -Z1 "$IPA" | grep '^Payload/LXMusic.app/Info.plist$')"
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: build/xcodebuild.log
+          if-no-files-found: ignore
+
+      - name: Upload .ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LXMusic-ipa
+          path: dist/*.ipa
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,20 @@
+# Xcode 构建产物
+build/
+dist/
+DerivedData/
+*.xcuserdatad
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# 打包与签名材料（不要提交）
+*.ipa
+*.mobileprovision
+*.p12
+*.cer
+
+# 系统文件
+.DS_Store
+*.swp
+__pycache__/
+*.pyc
