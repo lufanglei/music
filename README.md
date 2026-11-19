@@ -17,7 +17,7 @@
 1. 交付时这台 Mac **只有 Command Line Tools，没有 Xcode、没有 iOS SDK、钥匙串里 0 个签名证书**，因此本机无法编译 arm64 iOS 二进制，也无法产出可安装的包。硬凑一个 zip 改名成 `.ipa` 是假货，不做。
 2. iOS App 必须经 Apple 签名才能装进 iPhone，签名需要**你自己的** Apple ID / 证书。任何第三方都无法替你产出「不需要你参与就能装进你手机」的包——这是 iOS 机制，不是工程问题。
 
-好消息是：**云端 macOS 构建机已经把这个工程真实编译成功，并产出了 .ipa** —— 本机文件在 `dist/LXMusic-unsigned-Release.ipa`（553 KB，arm64、未签名），固定下载地址见第三节。所以现在其实**不必再装 Xcode**：拿这个包用侧载工具签名即可。若仍想在本机编译，第三节路径 B 也给出了命令（这台 Mac 还有 179 GB 可用空间，装得下）。
+好消息是：**云端 macOS 构建机已经把这个工程真实编译成功，并产出了 .ipa** —— 本机文件在 `dist/LXMusic-unsigned-Release.ipa`（657 KB，arm64、未签名），固定下载地址见第三节。所以现在其实**不必再装 Xcode**：拿这个包用侧载工具签名即可。若仍想在本机编译，第三节路径 B 也给出了命令（这台 Mac 还有 179 GB 可用空间，装得下）。
 
 ---
 
@@ -156,7 +156,13 @@ LXMusic-iOS/
 https://github.com/lufanglei/music/releases/download/ipa-latest/LXMusic-unsigned-Release.ipa
 ```
 
-也可以打开仓库的 **Releases** 页手动下载。本机副本在 `dist/LXMusic-unsigned-Release.ipa`（因每次构建会覆盖同名资产，SHA256 会变化，需要时自行执行 `shasum -a 256` 校验）。
+也可以打开仓库的 **Releases** 页手动下载。本机副本在 `dist/LXMusic-unsigned-Release.ipa`：
+
+```
+657 KB · SHA256 b586a1b30ac56cd98d331a81825a19dc9aee86668405c9c5a8784bd63e0c201f
+```
+
+（每次构建会覆盖同名资产，SHA256 会变化，需要时自行执行 `shasum -a 256` 校验。）
 
 ### 路径 B：本机装好 Xcode 后一条命令
 
