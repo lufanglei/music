@@ -127,36 +127,122 @@ struct PlaylistDetailView: View {
     @EnvironmentObject var library: LibraryStore
     let playlistID: String
 
+    @State private var showRename = false
+    @State private var renameName = ""
+
     private var playlist: Playlist? { library.playlists.first { $0.id == playlistID } }
+    private var isFavoriteList: Bool { playlist?.name == "我喜欢的" }
 
     var body: some View {
         List {
             if let playlist = playlist {
-                if !playlist.musics.isEmpty {
-                    Button { PlayerService.shared.playAll(playlist.musics) } label: {
-                        Label("播放全部", systemImage: "play.fill")
-                    }
+                Section {
+                    header(playlist)
+                        .listRowInsets(EdgeInsets(top: 14, leading: 16, bottom: 16, trailing: 16))
+                        .listRowBackground(Color.clear)
                 }
-                ForEach(playlist.musics) { music in
-                    SongRow(music: music) {
-                        PlayerService.shared.play(music, in: playlist.musics)
+
+                Section {
+                    if playlist.musics.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("歌单还是空的")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Text("去「发现」搜索歌曲，或在「歌单 → 推荐歌单」里打开一个榜单，长按歌曲选择「添加到歌单」。")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    } else {
+                        Button { PlayerService.shared.playAll(playlist.musics) } label: {
+                            Label("播放全部（\(playlist.musics.count) 首）", systemImage: "play.fill")
+                        }
+                        Button { PlayerService.shared.playAll(playlist.musics.shuffled()) } label: {
+                            Label("随机播放", systemImage: "shuffle")
+                        }
+                        ForEach(Array(playlist.musics.enumerated()), id: \.element.id) { index, music in
+                            SongRow(music: music, index: index + 1) {
+                                PlayerService.shared.play(music, in: playlist.musics)
+                            }
+                        }
+                        .onDelete { offsets in
+                            let ids = offsets.compactMap {
+                                playlist.musics.indices.contains($0) ? playlist.musics[$0].id : nil
+                            }
+                            ids.forEach { library.remove(musicID: $0, from: playlistID) }
+                        }
+                        .onMove { source, destination in
+                            library.moveMusic(in: playlistID, from: source, to: destination)
+                        }
                     }
-                }
-                .onDelete { offsets in
-                    let ids = offsets.compactMap {
-                        playlist.musics.indices.contains($0) ? playlist.musics[$0].id : nil
-                    }
-                    ids.forEach { library.remove(musicID: $0, from: playlistID) }
-                }
-                if playlist.musics.isEmpty {
-                    Text("这个列表还是空的，去「发现」里搜索并添加歌曲吧。")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                } header: {
+                    Text("\(playlist.musics.count) 首")
                 }
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(playlist?.name ?? "列表")
+        .navigationTitle(playlist?.name ?? "歌单")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                HStack(spacing: 14) {
+                    if (playlist?.musics.count ?? 0) > 1 {
+                        EditButton()
+                    }
+                    Menu {
+                        Button {
+                            renameName = playlist?.name ?? ""
+                            showRename = true
+                        } label: {
+                            Label("重命名歌单", systemImage: "pencil")
+                        }
+                        if !isFavoriteList {
+                            Button(role: .destructive) {
+                                library.deletePlaylist(id: playlistID)
+                            } label: {
+                                Label("删除歌单", systemImage: "trash")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
+        }
+        .alert("重命名歌单", isPresented: $showRename) {
+            TextField("歌单名称", text: $renameName)
+            Button("取消", role: .cancel) {}
+            Button("保存") { library.renamePlaylist(id: playlistID, name: renameName) }
+        }
+    }
+
+    private func header(_ playlist: Playlist) -> some View {
+        HStack(spacing: 14) {
+            PlaylistCover(musics: playlist.musics,
+                          symbol: isFavoriteList ? "heart.fill" : "music.note.list",
+                          highlighted: isFavoriteList)
+                .frame(width: 92, height: 92)
+                .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(playlist.name)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .lineLimit(2)
+                Text(playlist.musics.isEmpty ? "空歌单" : "\(playlist.musics.count) 首歌曲")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("创建于 \(Self.dateString(playlist.createdAt))")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private static func dateString(_ stamp: TimeInterval) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date(timeIntervalSince1970: stamp))
     }
 }

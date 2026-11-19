@@ -3,6 +3,7 @@ import UIKit
 
 enum AppTab: Int {
     case discover
+    case playlists
     case library
     case settings
 }
@@ -18,6 +19,9 @@ struct RootView: View {
                 DiscoverView()
                     .tabItem { Label("发现", systemImage: "magnifyingglass") }
                     .tag(AppTab.discover)
+                PlaylistHubView()
+                    .tabItem { Label("歌单", systemImage: "rectangle.stack.fill") }
+                    .tag(AppTab.playlists)
                 LibraryView()
                     .tabItem { Label("我的", systemImage: "music.note.list") }
                     .tag(AppTab.library)

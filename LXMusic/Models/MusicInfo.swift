@@ -98,4 +98,14 @@ struct MusicInfo: Codable, Hashable, Identifiable {
         let total = Int(seconds)
         return String(format: "%02d:%02d", total / 60, total % 60)
     }
+
+    /// 把 Apple 的 100 尺寸封面换成高清封面。
+    /// artworkUrl100 的尺寸片段并不固定为 `100x100bb`（实测还有 `100x109bb`），
+    /// 且同一 URL 里可能重复出现，所以用正则做全局替换。
+    static func hdArtwork(_ url: String?) -> String? {
+        guard let url = url, !url.isEmpty else { return nil }
+        return url.replacingOccurrences(of: #"\d+x\d+bb"#,
+                                        with: "600x600bb",
+                                        options: .regularExpression)
+    }
 }

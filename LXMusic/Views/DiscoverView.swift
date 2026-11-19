@@ -8,6 +8,7 @@ struct DiscoverView: View {
     @State private var message: String?
     @State private var hasSearched = false
     @State private var page = 0
+    @State private var hasMore = true
 
     var body: some View {
         NavigationStack {
@@ -48,7 +49,7 @@ struct DiscoverView: View {
                                 PlayerService.shared.play(music, in: results)
                             }
                         }
-                        if !results.isEmpty {
+                        if !results.isEmpty && hasMore {
                             Button {
                                 page += 1
                                 performSearch(append: true)
@@ -130,9 +131,12 @@ struct DiscoverView: View {
                     results.append(contentsOf: list.filter { !existing.contains($0.id) })
                 } else {
                     results = list
+                    hasMore = true
                 }
+                // 单页满 50 条才认为还有下一页
+                hasMore = hasMore && list.count >= 50
                 if results.isEmpty {
-                    message = "没有找到相关歌曲，试试更换关键词或到设置里切换搜索接口。"
+                    message = "没有找到相关歌曲。中文歌名/歌手会自动走中港台曲库，如果仍为空可以换个关键词，或在设置里切换搜索接口。"
                 }
             case .failure(let error):
                 message = "搜索失败：\(error.localizedDescription)"

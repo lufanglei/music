@@ -11,6 +11,7 @@
 		397FC9C31616685780B8971B /* MusicInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E5CC9B558257013BBB4F66C /* MusicInfo.swift */; };
 		B2CDCC877B83DCC5B7EBBAC3 /* Playlist.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E3578B484B677E994A2462 /* Playlist.swift */; };
 		982399BC6D7B0AD92321EED3 /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE974F20264C9DED15BA6F11 /* SettingsStore.swift */; };
+		A621E6B1F1B7AE1AE1026A3E /* ChartProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DC83AD8F7577725C87492EB /* ChartProvider.swift */; };
 		32B1227BA4D3DA95C7A34870 /* HTTPBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DD5F0A6910EC64C610F7E00 /* HTTPBridge.swift */; };
 		257AE0AC72459D20B68E4714 /* LocalMusicImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57BDE2BD6B7C87C94004EF6D /* LocalMusicImporter.swift */; };
 		46367DF2625020833347BA45 /* ScriptCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29C3F947C5C49B82A440867D /* ScriptCrypto.swift */; };
@@ -21,6 +22,7 @@
 		067A0D357B0E714DAE5B9E9E /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 271C3919F6A620B091B437B2 /* DiscoverView.swift */; };
 		F00209FCFCAF5657FD9BD1F6 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A845D4D72C23813B9F7F2E5 /* LibraryView.swift */; };
 		2C3C060314E5B3C3EED2BEED /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1225C982D2E39F7594876D0B /* PlayerView.swift */; };
+		AF67625FAA3280A52D9E1D3A /* PlaylistHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B57832D59369831C36EDF6C /* PlaylistHubView.swift */; };
 		1A3ED79270874DEBAFE0D2EC /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49A8E7F86D9ABDBD77E9954C /* RootView.swift */; };
 		2F0EEB554ACD1E7FA3BBBCAD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6471F4C6965EB32C1210C0E /* SettingsView.swift */; };
 		BC0C1CA2BB25B41211C804D6 /* AudioSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0CEE6C5675D3D869BFE24AD /* AudioSessionManager.swift */; };
@@ -41,6 +43,7 @@
 		1E5CC9B558257013BBB4F66C /* MusicInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicInfo.swift; sourceTree = "<group>"; };
 		D4E3578B484B677E994A2462 /* Playlist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playlist.swift; sourceTree = "<group>"; };
 		EE974F20264C9DED15BA6F11 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
+		7DC83AD8F7577725C87492EB /* ChartProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartProvider.swift; sourceTree = "<group>"; };
 		6DD5F0A6910EC64C610F7E00 /* HTTPBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPBridge.swift; sourceTree = "<group>"; };
 		57BDE2BD6B7C87C94004EF6D /* LocalMusicImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMusicImporter.swift; sourceTree = "<group>"; };
 		29C3F947C5C49B82A440867D /* ScriptCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptCrypto.swift; sourceTree = "<group>"; };
@@ -51,6 +54,7 @@
 		271C3919F6A620B091B437B2 /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoverView.swift; sourceTree = "<group>"; };
 		7A845D4D72C23813B9F7F2E5 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		1225C982D2E39F7594876D0B /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
+		7B57832D59369831C36EDF6C /* PlaylistHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistHubView.swift; sourceTree = "<group>"; };
 		49A8E7F86D9ABDBD77E9954C /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		E6471F4C6965EB32C1210C0E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		F0CEE6C5675D3D869BFE24AD /* AudioSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSessionManager.swift; sourceTree = "<group>"; };
@@ -147,6 +151,7 @@
 		038492F4B81F97A5F832F776 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				7DC83AD8F7577725C87492EB /* ChartProvider.swift */,
 				6DD5F0A6910EC64C610F7E00 /* HTTPBridge.swift */,
 				57BDE2BD6B7C87C94004EF6D /* LocalMusicImporter.swift */,
 				29C3F947C5C49B82A440867D /* ScriptCrypto.swift */,
@@ -164,6 +169,7 @@
 				271C3919F6A620B091B437B2 /* DiscoverView.swift */,
 				7A845D4D72C23813B9F7F2E5 /* LibraryView.swift */,
 				1225C982D2E39F7594876D0B /* PlayerView.swift */,
+				7B57832D59369831C36EDF6C /* PlaylistHubView.swift */,
 				49A8E7F86D9ABDBD77E9954C /* RootView.swift */,
 				E6471F4C6965EB32C1210C0E /* SettingsView.swift */,
 			);
@@ -254,6 +260,7 @@
 				397FC9C31616685780B8971B /* MusicInfo.swift in Sources */,
 				B2CDCC877B83DCC5B7EBBAC3 /* Playlist.swift in Sources */,
 				982399BC6D7B0AD92321EED3 /* SettingsStore.swift in Sources */,
+				A621E6B1F1B7AE1AE1026A3E /* ChartProvider.swift in Sources */,
 				32B1227BA4D3DA95C7A34870 /* HTTPBridge.swift in Sources */,
 				257AE0AC72459D20B68E4714 /* LocalMusicImporter.swift in Sources */,
 				46367DF2625020833347BA45 /* ScriptCrypto.swift in Sources */,
@@ -264,6 +271,7 @@
 				067A0D357B0E714DAE5B9E9E /* DiscoverView.swift in Sources */,
 				F00209FCFCAF5657FD9BD1F6 /* LibraryView.swift in Sources */,
 				2C3C060314E5B3C3EED2BEED /* PlayerView.swift in Sources */,
+				AF67625FAA3280A52D9E1D3A /* PlaylistHubView.swift in Sources */,
 				1A3ED79270874DEBAFE0D2EC /* RootView.swift in Sources */,
 				2F0EEB554ACD1E7FA3BBBCAD /* SettingsView.swift in Sources */,
 				BC0C1CA2BB25B41211C804D6 /* AudioSessionManager.swift in Sources */,

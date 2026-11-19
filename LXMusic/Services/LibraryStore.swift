@@ -97,6 +97,13 @@ final class LibraryStore: ObservableObject {
         save()
     }
 
+    /// 歌单内拖动排序
+    func moveMusic(in playlistID: String, from source: IndexSet, to destination: Int) {
+        guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else { return }
+        playlists[index].musics.move(fromOffsets: source, toOffset: destination)
+        save()
+    }
+
     func addLocal(_ music: MusicInfo) {
         guard !localMusics.contains(where: { $0.id == music.id }) else { return }
         localMusics.insert(music, at: 0)

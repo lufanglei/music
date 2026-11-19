@@ -71,43 +71,112 @@ final class SearchService {
 // MARK: - Apple 官方曲库
 
 enum ITunesSearchProvider {
+    /// 一次取满 200 条（iTunes Search 不支持 offset 翻页，只认 limit），
+    /// 之后由本地切片实现「加载更多」，避免每次翻页都打一次接口。
+    private static let pageSize = 50
+    private static let fetchLimit = 200
+    private static var cache: [String: (songs: [MusicInfo], date: Date)] = [:]
+    private static let cacheLifetime: TimeInterval = 60 * 10
+
     static func search(keyword: String,
                        page: Int,
                        completion: @escaping (Result<[MusicInfo], Error>) -> Void) {
+        let cacheKey = keyword.lowercased()
+
+        if let hit = cache[cacheKey],
+           Date().timeIntervalSince(hit.date) < cacheLifetime {
+            completion(.success(slice(hit.songs, page: page)))
+            return
+        }
+
         guard let encoded = keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
             completion(.failure(SearchError.badResponse))
             return
         }
-        let url = "https://itunes.apple.com/search?term=\(encoded)&entity=song&limit=50&offset=\(page * 50)&country=cn"
+
+        // 关键：iTunes 的 cn storefront 搜索接口已不返回结果，中文关键词在 us 区也不稳定。
+        // 实测中港台区对中文支持最好，英文则走美/英区。
+        let stores = storefronts(for: keyword)
+        attempt(encoded: encoded,
+                stores: stores,
+                index: 0,
+                original: keyword,
+                page: page,
+                completion: completion)
+    }
+
+    private static func attempt(encoded: String,
+                                stores: [String],
+                                index: Int,
+                                original: String,
+                                page: Int,
+                                completion: @escaping (Result<[MusicInfo], Error>) -> Void) {
+        guard index < stores.count else {
+            completion(.success([]))
+            return
+        }
+        let url = "https://itunes.apple.com/search?term=\(encoded)&entity=song&limit=\(fetchLimit)&country=\(stores[index])"
         NetworkJSON.get(url) { result in
             switch result {
             case .success(let value):
                 let songs = parse(value)
-                if songs.isEmpty, page == 0 {
-                    // 部分地区曲库为空时回退到全球区
-                    let fallback = url.replacingOccurrences(of: "country=cn", with: "country=us")
-                    NetworkJSON.get(fallback) { fallbackResult in
-                        completion(fallbackResult.map { ITunesSearchProvider.parse($0) })
-                    }
+                if songs.isEmpty {
+                    attempt(encoded: encoded,
+                            stores: stores,
+                            index: index + 1,
+                            original: original,
+                            page: page,
+                            completion: completion)
                 } else {
-                    completion(.success(songs))
+                    cache[original.lowercased()] = (songs, Date())
+                    completion(.success(slice(songs, page: page)))
                 }
             case .failure(let error):
-                completion(.failure(error))
+                if index == stores.count - 1 {
+                    completion(.failure(error))
+                } else {
+                    attempt(encoded: encoded,
+                            stores: stores,
+                            index: index + 1,
+                            original: original,
+                            page: page,
+                            completion: completion)
+                }
             }
         }
+    }
+
+    /// 中文/日文/韩文优先中港台区，其余走美英区
+    static func storefronts(for keyword: String) -> [String] {
+        let hasCJK = keyword.unicodeScalars.contains { scalar in
+            (0x3040...0x30FF).contains(scalar.value) ||   // 日文假名
+            (0x3400...0x4DBF).contains(scalar.value) ||   // 中文扩展 A
+            (0x4E00...0x9FFF).contains(scalar.value) ||   // 中文基本区
+            (0xAC00...0xD7AF).contains(scalar.value)      // 韩文
+        }
+        return hasCJK ? ["tw", "hk", "us"] : ["us", "gb"]
+    }
+
+    private static func slice(_ songs: [MusicInfo], page: Int) -> [MusicInfo] {
+        let start = page * pageSize
+        guard start < songs.count else { return [] }
+        let end = min(start + pageSize, songs.count)
+        return Array(songs[start..<end])
     }
 
     static func parse(_ value: Any) -> [MusicInfo] {
         guard let dict = value as? [String: Any],
               let results = dict["results"] as? [[String: Any]] else { return [] }
+        var seen = Set<String>()
         return results.compactMap { item in
             guard let name = item["trackName"] as? String else { return nil }
-            let id = (item["trackId"] as? NSNumber)?.stringValue ?? UUID().uuidString
+            let id = (item["trackId"] as? NSNumber)?.stringValue
+                ?? (item["trackId"] as? String)
+                ?? UUID().uuidString
+            guard seen.insert(id).inserted else { return nil }
             let singer = item["artistName"] as? String ?? ""
             let album = item["collectionName"] as? String ?? ""
-            let pic = (item["artworkUrl100"] as? String)?
-                .replacingOccurrences(of: "100x100", with: "600x600")
+            let pic = MusicInfo.hdArtwork(item["artworkUrl100"] as? String)
             let millis = (item["trackTimeMillis"] as? NSNumber)?.doubleValue ?? 0
             let interval = millis > 0 ? MusicInfo.formatInterval(millis / 1000) : nil
             return MusicInfo.make(id: "itunes_" + id,

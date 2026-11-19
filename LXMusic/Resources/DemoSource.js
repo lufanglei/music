@@ -22,13 +22,19 @@ const httpRequest = (url, options) => new Promise((resolve, reject) => {
 const lookupPreview = (musicInfo) => {
   const id = musicInfo.trackId || musicInfo.songId || (musicInfo.meta && musicInfo.meta.songId)
   if (!id) return Promise.reject('缺少歌曲 ID，无法查询试听链接')
-  return httpRequest('https://itunes.apple.com/lookup?id=' + encodeURIComponent(String(id)) + '&entity=song&country=cn')
-    .then(body => {
+  // 榜单来自不同地区的 storefront，逐个试；不带 country 时 Apple 会用默认区
+  const stores = ['', '&country=tw', '&country=us', '&country=jp', '&country=hk']
+  const tryAt = (index) => {
+    if (index >= stores.length) return Promise.reject(new Error('该歌曲没有可用的试听链接'))
+    const url = 'https://itunes.apple.com/lookup?id=' + encodeURIComponent(String(id)) + '&entity=song' + stores[index]
+    return httpRequest(url).then(body => {
       const data = JSON.parse(body)
       const item = (data.results || [])[0]
       if (item && item.previewUrl) return item.previewUrl
-      throw new Error('该歌曲没有可用的试听链接')
-    })
+      return tryAt(index + 1)
+    }).catch(() => tryAt(index + 1))
+  }
+  return tryAt(0)
 }
 
 on(EVENT_NAMES.request, ({ source, action, info }) => {

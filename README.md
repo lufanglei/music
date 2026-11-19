@@ -36,6 +36,7 @@
 | 脚本宿主环境 | 额外补齐 `fetch`、`httpFetch`、`setTimeout/Interval`、`TextEncoder/Decoder`、`Buffer`、`URLSearchParams`、`console`、`btoa/atob` |
 | `musicUrl` / `lyric` / `pic` + `qualitys` 音质 | ✅ 按脚本 `inited` 声明分发，音质自动回退 |
 | 我的列表 / 播放队列 / 播放模式 | ✅ 本地 JSON 持久化，列表循环 / 单曲循环 / 随机 |
+| 歌单（歌单广场 + 排行榜） | ✅ 独立的「歌单」标签页：6 个地区官方榜单 + 自建歌单（新建 / 重命名 / 删除 / 拖动排序 / 批量加入） |
 | 歌词 | ✅ LRC 解析、逐行高亮滚动（逐字歌词降级为按行） |
 | 播放器 | ✅ AVPlayer 后台播放、锁屏与控制中心信息、耳机线控、来电中断恢复 |
 | 桌面版 `musicSdk` 的 kw/kg/tx/wy/mg 内置搜索接口 | ❌ **未内置**（见「已知限制」），改为 Apple 官方曲库 + 自定义 HTTP 搜索接口 |
@@ -61,6 +62,27 @@
 
 这样即使你暂时没有音源，也能立刻验证整条链路。把你自己的洛雪音源脚本导入进去，就能播放对应平台的完整歌曲。
 
+### 歌单
+
+App 有独立的「歌单」标签页，分两块：
+
+**推荐歌单** —— 6 个地区的 Apple Music 官方热门榜（中国大陆 / 中国香港 / 美国 / 日本 / 韩国 / 英国）。数据来自 Apple Marketing Tools 的公开 RSS：
+
+```
+https://rss.applemarketingtools.com/api/v2/{storefront}/music/most-played/50/songs.json
+```
+
+选它而不是爬某个平台的私有歌单接口，理由有三点：无需密钥、按地区天然分好、条目里的 `id` 就是 iTunes `trackId`，能直接交给音源脚本换成播放链接。点进任一榜单可以「播放全部 / 随机播放 / 全部加入新歌单」。
+
+**我的歌单** —— 自己建的歌单，支持新建、长按重命名、删除、拖动排序、批量加歌；封面自动用前四首的专辑图拼成 2×2。
+
+添加歌曲的入口有三处：
+- 搜索结果列表长按歌曲 →「添加到歌单」，或直接「新建歌单…」
+- 本地音乐列表长按 → 同样可加入
+- 榜单详情右上角菜单 →「全部加入新歌单」
+
+> 洛雪桌面版的「歌单 / 排行榜」来自内置的 kw/kg/tx/wy/mg 平台 API，那些接口本工程没有内置（涉及签名加密与合规风险，见「已知限制」）。所以这里改用 Apple 官方榜单作为推荐歌单来源，功能形态与洛雪一致，数据源不同。
+
 ### 目录结构
 
 ```
@@ -78,11 +100,11 @@ LXMusic-iOS/
     ├── App/            LXMusicApp.swift、Info.plist（UIBackgroundModes=audio、ATS）
     ├── Models/         MusicInfo / Playlist / SourceCapability / Settings
     ├── Sources/        ScriptEngine、ScriptCrypto、HTTPBridge、SourceManager
-    │                   SearchProviders、LocalMusicImporter
+    │                   SearchProviders、ChartProvider、LocalMusicImporter
     │                   LXPrelude.js（JS 宿主）、DemoSource.js（示例音源）
     ├── Services/       PlayerService、NowPlayingService、AudioSessionManager
     │                   LibraryStore、LyricParser
-    ├── Views/          Root / Discover / Library / Player / Settings / Components
+    ├── Views/          Root / Discover / PlaylistHub / Library / Player / Settings / Components
     └── Resources/      Assets.xcassets（含 1024×1024 无 alpha 的 AppIcon）
 ```
 
@@ -320,9 +342,10 @@ send(EVENT_NAMES.inited, {
 
 - **iOS 真机编译与链接已通过**：GitHub Actions（`macos-15` / Xcode 16.4 / iPhoneOS 18.5 SDK）完整构建成功，`LXMusic` 可执行文件为 `Mach-O 64-bit executable arm64`
 - **.ipa 包结构已校验**：标准 `Payload/LXMusic.app/`，含 `Info.plist`、`LXMusic`、`Assets.car`、`LXPrelude.js`、`DemoSource.js`、`AppIcon*.png`；显示名 `LX Music`、Bundle ID `com.lufanglei.lxmusic`，均为 ASCII（侧载工具创建 App ID 不会报 `appIdName` 非法）
-- 21 个 Swift 文件全部通过 `swiftc -frontend -parse` 语法解析
+- 23 个 Swift 文件全部通过 `swiftc -frontend -parse` 语法解析
+- **歌单数据源做过端到端验证**：把 `ChartProvider.swift` + `MusicInfo.swift` 用 macOS SDK 单独编译成命令行程序真实运行，6 个地区榜单各返回 50 首，`songId` 与高清封面齐全；同时验证了 `hdArtwork` 对 `100x100bb` / `100x109bb` 两种尺寸片段的全局替换、跨区 `lookup` 补齐试听链接、以及 30 分钟缓存复用
 - 跨文件 `swiftc -typecheck`（macOS SDK）：仅报 `no such module 'UIKit'`（iOS 专属模块，属预期假阳性），在可解析范围内未发现跨文件引用或类型错误
-- `project.pbxproj` 通过 `plutil -lint`，76 个对象无悬空引用，21 个源文件全部进入 Sources 阶段，资源与 3 个系统框架齐全
+- `project.pbxproj` 通过 `plutil -lint`，无悬空引用，23 个源文件全部进入 Sources 阶段，资源与 3 个系统框架齐全
 - 新增的 shared scheme 通过 XML 解析校验；`tools/build_ipa.sh` 通过 `bash -n`；CI 工作流 YAML 结构完整
 - `Info.plist` 通过 `plutil -lint`（含 `UIBackgroundModes = audio`、ATS 例外）
 - AppIcon 已扁平化为 **1024×1024 RGB 无 alpha**，符合 `actool` 对 App Store 图标的要求（原 RGBA 会导致编译期图标校验报错）
@@ -335,7 +358,8 @@ send(EVENT_NAMES.inited, {
 - 本机仍无 Xcode / iOS SDK，无法本地编译；需要本机编译请先装 Xcode（路径 B）。
 - CI 与本机脚本产出的是**未签名** .ipa，必须经侧载工具或你自己的证书重签名才能安装。
 - 未内置桌面版 `musicSdk` 里 kw/kg/tx/wy/mg 的搜索接口：那些接口带平台私有加密签名、变动频繁且涉及版权合规，不适合原样搬进一个未签名的本地工程。需要的话请通过「自定义 HTTP 搜索接口」指向你自建的服务，或自行在 `SearchProviders.swift` 增加 Provider。
-- 未实现下载、多端数据同步、桌面歌词、音效均衡器、歌单/排行榜详情页。
+- 未实现下载、多端数据同步、桌面歌词、音效均衡器、歌单分享/导入导出。
+- 搜索走 iTunes Search API 时，**`country=cn` 的接口已不返回结果**，代码里改为中文关键词自动走中国台湾 / 中国香港 / 美国区，英文走美国 / 英国区；接口对短时间高频请求会返回空结果，所以结果做了 10 分钟缓存。推荐歌单的 RSS 有两个域名，实测会交替超时，已做双域名轮换重试（最多 3 次）。
 - `XMLHttpRequest`、`Worker`、`crypto.subtle` 未提供；绝大多数音源脚本用 `lx.request` / `fetch`，如需可自行在 `LXPrelude.js` 补。
 - iOS PWA 常见的后台限制在这里不存在（原生 audio 后台模式 + 远程控制已配置），但**锁屏切歌需要 App 至少成功播放过一次**才能注册远程控制。
 - 示例源播放的是 Apple 官方 30 秒试听，不是完整歌曲；完整播放请导入你自己的音源。

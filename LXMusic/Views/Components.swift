@@ -72,11 +72,22 @@ struct ArtworkView: View {
 struct SongRow: View {
     @EnvironmentObject var library: LibraryStore
     let music: MusicInfo
+    /// 排行榜、歌单详情里可显示序号
+    var index: Int? = nil
     let onPlay: () -> Void
+
+    @State private var showNewPlaylist = false
+    @State private var newPlaylistName = ""
 
     var body: some View {
         Button(action: onPlay) {
             HStack(spacing: 12) {
+                if let index = index {
+                    Text("\(index)")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundColor(.secondary)
+                        .frame(width: 22, alignment: .trailing)
+                }
                 ArtworkView(urlString: music.meta.picUrl, size: 48)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(music.displayName)
@@ -114,11 +125,35 @@ struct SongRow: View {
             Button { PlayerService.shared.appendToQueue(music) } label: {
                 Label("加入播放队列", systemImage: "text.badge.plus")
             }
-            ForEach(library.playlists) { playlist in
-                Button { library.add(music, to: playlist.id) } label: {
-                    Label("添加到「\(playlist.name)」", systemImage: "plus")
+            Menu {
+                ForEach(library.playlists) { playlist in
+                    Button { library.add(music, to: playlist.id) } label: {
+                        Label(playlist.name, systemImage: "music.note.list")
+                    }
                 }
+                Divider()
+                Button {
+                    newPlaylistName = ""
+                    showNewPlaylist = true
+                } label: {
+                    Label("新建歌单…", systemImage: "plus")
+                }
+            } label: {
+                Label("添加到歌单", systemImage: "text.badge.plus")
             }
+        }
+        .alert("新建歌单", isPresented: $showNewPlaylist) {
+            TextField("歌单名称", text: $newPlaylistName)
+            Button("取消", role: .cancel) { newPlaylistName = "" }
+            Button("创建并添加") {
+                library.createPlaylist(name: newPlaylistName)
+                if let created = library.playlists.last {
+                    library.add(music, to: created.id)
+                }
+                newPlaylistName = ""
+            }
+        } message: {
+            Text("会创建新歌单并把「\(music.displayName)」加进去。")
         }
     }
 }
