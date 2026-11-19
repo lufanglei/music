@@ -146,6 +146,14 @@ final class SourceManager: ObservableObject {
             return
         }
 
+        // 榜单歌曲自带平台来源（kg / tx / wy）。脚本没声明该平台时不要退到别的源，
+        // 否则会把酷狗歌曲丢给 Apple 试听源，拿到一个不相干的播放地址。
+        if let platform = Self.platformName(for: music.source),
+           capabilities[music.source] == nil {
+            completion(.failure(LXError.missingSource(platform)))
+            return
+        }
+
         let (key, resolvedQuality) = resolveSource(for: music, action: "musicUrl", quality: quality)
         let info: [String: Any] = [
             "type": resolvedQuality as Any? ?? NSNull(),
@@ -254,6 +262,18 @@ final class SourceManager: ObservableObject {
         }
         if key == "local" { resolved = nil }
         return (key, resolved)
+    }
+
+    /// 平台 source key 对应的中文名，用于给用户看得懂的报错
+    static func platformName(for source: String) -> String? {
+        switch source {
+        case "kg": return "酷狗音乐"
+        case "tx": return "QQ 音乐"
+        case "wy": return "网易云音乐"
+        case "kw": return "酷我音乐"
+        case "mg": return "咪咕音乐"
+        default: return nil
+        }
     }
 
     private static func directURL(from music: MusicInfo) -> URL? {

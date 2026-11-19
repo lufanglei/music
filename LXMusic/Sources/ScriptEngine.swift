@@ -5,12 +5,16 @@ enum LXError: LocalizedError {
     case script(String)
     case noSource
     case invalidResponse
+    /// 榜单歌曲来自 kg/tx/wy，但当前脚本没有声明该平台源
+    case missingSource(String)
 
     var errorDescription: String? {
         switch self {
         case .script(let message): return message
         case .noSource: return "尚未启用可用的自定义音源"
         case .invalidResponse: return "音源返回的数据格式无法识别"
+        case .missingSource(let platform):
+            return "还没导入\(platform)音源，请到「设置 → 音源管理」导入支持该平台的音源脚本"
         }
     }
 }

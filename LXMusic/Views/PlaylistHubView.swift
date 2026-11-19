@@ -1,23 +1,30 @@
 import SwiftUI
 import UIKit
 
-/// 「歌单」页：上半部分是推荐歌单（各地区官方榜单），下半部分是用户自己建的歌单。
+/// 「歌单」页：顶部切换榜单来源，下面是该来源的完整榜单列表，最后是用户自己建的歌单。
+///
+/// 与桌面版对齐：桌面左侧的「音乐来源」下拉（酷狗 / QQ / 网易云 / Apple）+ 每个来源下的
+/// 一长串榜单，这里用同样的结构呈现，只是把下拉换成了横向胶囊。
 struct PlaylistHubView: View {
     @EnvironmentObject var library: LibraryStore
+    @EnvironmentObject var sources: SourceManager
+
+    @State private var platform: BoardPlatform = .apple
+    @State private var catalogs: [BoardPlatform: [MusicBoard]] = [:]
+    @State private var loadingPlatforms: Set<BoardPlatform> = []
+    @State private var errors: [BoardPlatform: String] = [:]
 
     @State private var showNewPlaylist = false
     @State private var newName = ""
     @State private var renameTarget: Playlist?
     @State private var renameName = ""
 
-    private let columns = [GridItem(.flexible(), spacing: 12),
-                           GridItem(.flexible(), spacing: 12)]
-
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    chartSection
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    platformPicker
+                    boardSection
                     myPlaylistsSection
                     footer
                 }
@@ -31,7 +38,7 @@ struct PlaylistHubView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 6)
                 .padding(.bottom, 120)
             }
             .background(Color(UIColor.systemGroupedBackground))
@@ -58,33 +65,143 @@ struct PlaylistHubView: View {
                     renameTarget = nil
                 }
             }
+            .task { loadCatalog(for: platform) }
         }
     }
 
-    // MARK: - 推荐歌单
+    // MARK: - 来源切换
 
-    private var chartSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("推荐歌单", subtitle: "Apple Music 各地区热门榜单 · 每日更新")
-
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(ChartPlaylist.all) { chart in
-                    NavigationLink {
-                        ChartDetailView(chart: chart)
+    private var platformPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(BoardPlatform.allCases) { item in
+                    Button {
+                        guard platform != item else { return }
+                        platform = item
+                        loadCatalog(for: item)
                     } label: {
-                        ChartCard(chart: chart)
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(isReady(item) ? Color.green : Color.orange)
+                                .frame(width: 6, height: 6)
+                            Text(item.displayName)
+                                .font(.subheadline)
+                                .fontWeight(platform == item ? .semibold : .regular)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(
+                            Capsule().fill(platform == item
+                                           ? Color.accentColor.opacity(0.16)
+                                           : Color(UIColor.secondarySystemGroupedBackground))
+                        )
+                        .overlay(
+                            Capsule().stroke(platform == item ? Color.accentColor.opacity(0.45) : Color.clear,
+                                             lineWidth: 1)
+                        )
+                        .foregroundColor(platform == item ? .accentColor : .primary)
                     }
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.vertical, 2)
         }
+    }
+
+    // MARK: - 榜单列表
+
+    private var boardSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(platform == .apple ? "官方热歌榜" : "\(platform.displayName)榜单")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                Spacer()
+                if let boards = catalogs[platform], !boards.isEmpty {
+                    Text("\(boards.count) 个")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            if !isReady(platform) {
+                sourceHint
+            }
+
+            if let boards = catalogs[platform], !boards.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(Array(boards.enumerated()), id: \.element.id) { index, board in
+                        NavigationLink {
+                            BoardDetailView(board: board)
+                        } label: {
+                            BoardRow(board: board, ready: isReady(board.platform))
+                        }
+                        .buttonStyle(.plain)
+
+                        if index < boards.count - 1 {
+                            Divider().padding(.leading, 76)
+                        }
+                    }
+                }
+                .background(Color(UIColor.secondarySystemGroupedBackground),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            } else if loadingPlatforms.contains(platform) {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("正在获取榜单目录…")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 14)
+            } else if let message = errors[platform] {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Button("重新加载") { loadCatalog(for: platform, force: true) }
+                        .font(.subheadline)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(UIColor.secondarySystemGroupedBackground),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+        }
+    }
+
+    private var sourceHint: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle")
+                .font(.system(size: 13))
+                .foregroundColor(.orange)
+                .padding(.top, 1)
+            Text(platform == .apple
+                 ? "还没有可用的 Apple 试听音源。到「设置 → 音源管理」安装示例源后即可播放。"
+                 : "还没导入\(platform.displayName)音源：榜单可以浏览，点播放会提示导入。到「设置 → 音源管理」粘贴对应音源脚本即可。")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.09),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     // MARK: - 我的歌单
 
     private var myPlaylistsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("我的歌单", subtitle: "\(library.playlists.count) 个 · 长按可重命名或删除")
+            HStack(alignment: .firstTextBaseline) {
+                Text("我的歌单")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                Spacer()
+                Text("\(library.playlists.count) 个")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
 
             VStack(spacing: 0) {
                 ForEach(Array(library.playlists.enumerated()), id: \.element.id) { index, playlist in
@@ -146,66 +263,105 @@ struct PlaylistHubView: View {
     }
 
     private var footer: some View {
-        Text("推荐歌单来自 Apple 官方榜单，播放使用官方试听片段；在「设置 → 音源管理」导入洛雪音源脚本后，同一批歌曲会改用脚本返回的播放地址。")
+        Text("榜单目录与曲目来自各平台公开接口，Apple 榜单来自 Apple 官方 RSS。播放仍由你导入的洛雪音源脚本取链接：酷狗榜单需要声明 kg 的音源，QQ 音乐需要 tx，网易云需要 wy。")
             .font(.caption2)
             .foregroundColor(.secondary)
             .padding(.horizontal, 2)
     }
 
-    private func sectionHeader(_ title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.title3)
-                .fontWeight(.semibold)
-            Text(subtitle)
-                .font(.caption)
-                .foregroundColor(.secondary)
+    // MARK: - 逻辑
+
+    private func isReady(_ platform: BoardPlatform) -> Bool {
+        if let key = platform.sourceKey {
+            return sources.capabilities[key] != nil
+        }
+        return sources.capabilities["itunes"] != nil
+    }
+
+    private func loadCatalog(for platform: BoardPlatform, force: Bool = false) {
+        if !force, catalogs[platform] != nil { return }
+        guard !loadingPlatforms.contains(platform) else { return }
+        loadingPlatforms.insert(platform)
+        errors[platform] = nil
+        BoardService.shared.catalog(for: platform, force: force) { result in
+            loadingPlatforms.remove(platform)
+            switch result {
+            case .success(let boards):
+                catalogs[platform] = boards
+            case .failure(let error):
+                errors[platform] = "加载失败：\(error.localizedDescription)"
+            }
         }
     }
 }
 
-// MARK: - 推荐歌单卡片
+// MARK: - 榜单行
 
-struct ChartCard: View {
-    let chart: ChartPlaylist
+struct BoardRow: View {
+    let board: MusicBoard
+    let ready: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .bottomLeading) {
-                LinearGradient(colors: chart.colors.map { Color(hex: $0) },
-                               startPoint: .topLeading,
-                               endPoint: .bottomTrailing)
-                Circle()
-                    .fill(Color.white.opacity(0.12))
-                    .frame(width: 92, height: 92)
-                    .offset(x: 58, y: -26)
-                Image(systemName: chart.symbol)
-                    .font(.system(size: 30, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.92))
-                    .padding(.leading, 14)
-                    .padding(.bottom, 20)
-            }
-            .frame(height: 104)
-            .clipped()
+        HStack(spacing: 12) {
+            BoardCover(board: board, size: 56)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(chart.title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                Text(board.title)
+                    .font(.body)
                     .foregroundColor(.primary)
                     .lineLimit(1)
-                Text(chart.subtitle)
-                    .font(.caption2)
+                Text(board.subtitle)
+                    .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
+
+            Spacer(minLength: 6)
+
+            if !ready {
+                Text("需音源")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.orange)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Color.orange.opacity(0.14)))
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(Color(UIColor.tertiaryLabel))
         }
-        .background(Color(UIColor.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .contentShape(Rectangle())
+    }
+}
+
+/// 榜单封面：有真实的榜单图就用图，没有则用渐变 + 图标兜底
+struct BoardCover: View {
+    let board: MusicBoard
+    var size: CGFloat = 56
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: board.colors.map { Color(hex: $0) },
+                           startPoint: .topLeading,
+                           endPoint: .bottomTrailing)
+            Image(systemName: board.platform.placeholderSymbol)
+                .font(.system(size: size * 0.32, weight: .semibold))
+                .foregroundColor(.white.opacity(0.9))
+            if let urlString = board.coverURL, let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        Color.clear
+                    }
+                }
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.18, style: .continuous))
     }
 }
 
@@ -309,13 +465,21 @@ struct PlaylistCover: View {
 
 // MARK: - 榜单详情
 
-struct ChartDetailView: View {
+struct BoardDetailView: View {
     @EnvironmentObject var library: LibraryStore
-    let chart: ChartPlaylist
+    @EnvironmentObject var sources: SourceManager
+    let board: MusicBoard
 
     @State private var songs: [MusicInfo] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+
+    private var platformReady: Bool {
+        guard let key = board.platform.sourceKey else {
+            return sources.capabilities["itunes"] != nil
+        }
+        return sources.capabilities[key] != nil
+    }
 
     var body: some View {
         List {
@@ -323,6 +487,16 @@ struct ChartDetailView: View {
                 header
                     .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 16, trailing: 16))
                     .listRowBackground(Color.clear)
+            }
+
+            if !platformReady {
+                Section {
+                    Text(board.platform == .apple
+                         ? "当前没有可用的 Apple 试听音源，播放会失败。到「设置 → 音源管理」安装示例源。"
+                         : "还没导入\(board.platform.displayName)音源，点播放会提示导入。到「设置 → 音源管理」粘贴对应脚本后回来即可播放完整歌曲。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
 
             if let errorMessage = errorMessage {
@@ -358,7 +532,7 @@ struct ChartDetailView: View {
                 Section {
                     HStack(spacing: 10) {
                         ProgressView()
-                        Text("正在获取榜单…")
+                        Text("正在获取榜单曲目…")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -367,7 +541,7 @@ struct ChartDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(chart.title)
+        .navigationTitle(board.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -391,25 +565,18 @@ struct ChartDetailView: View {
 
     private var header: some View {
         HStack(spacing: 14) {
-            ZStack {
-                LinearGradient(colors: chart.colors.map { Color(hex: $0) },
-                               startPoint: .topLeading,
-                               endPoint: .bottomTrailing)
-                Image(systemName: chart.symbol)
-                    .font(.system(size: 34, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.92))
-            }
-            .frame(width: 96, height: 96)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: .black.opacity(0.14), radius: 10, y: 4)
+            BoardCover(board: board, size: 96)
+                .shadow(color: .black.opacity(0.14), radius: 10, y: 4)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(chart.title)
+                Text(board.title)
                     .font(.headline)
-                Text(chart.subtitle)
+                Text(board.subtitle)
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text(songs.isEmpty ? "Apple Music 官方榜单" : "\(songs.count) 首 · Apple Music 官方榜单")
+                Text(songs.isEmpty
+                     ? board.platform.displayName
+                     : "\(songs.count) 首 · \(board.platform.displayName)")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -421,7 +588,7 @@ struct ChartDetailView: View {
         guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
-        ChartService.shared.songs(for: chart, force: force) { result in
+        BoardService.shared.songs(for: board, force: force) { result in
             isLoading = false
             switch result {
             case .success(let list):
@@ -436,14 +603,12 @@ struct ChartDetailView: View {
 
     private func playShuffled() {
         guard !songs.isEmpty else { return }
-        let shuffled = songs.shuffled()
-        PlayerService.shared.playAll(shuffled)
+        PlayerService.shared.playAll(songs.shuffled())
     }
 
     private func saveAllToNewPlaylist() {
         guard !songs.isEmpty else { return }
-        let name = "\(chart.title)"
-        library.createPlaylist(name: name)
+        library.createPlaylist(name: board.title)
         guard let target = library.playlists.last else { return }
         library.add(songs, to: target.id)
     }

@@ -36,7 +36,7 @@
 | 脚本宿主环境 | 额外补齐 `fetch`、`httpFetch`、`setTimeout/Interval`、`TextEncoder/Decoder`、`Buffer`、`URLSearchParams`、`console`、`btoa/atob` |
 | `musicUrl` / `lyric` / `pic` + `qualitys` 音质 | ✅ 按脚本 `inited` 声明分发，音质自动回退 |
 | 我的列表 / 播放队列 / 播放模式 | ✅ 本地 JSON 持久化，列表循环 / 单曲循环 / 随机 |
-| 歌单（歌单广场 + 排行榜） | ✅ 独立的「歌单」标签页：6 个地区官方榜单 + 自建歌单（新建 / 重命名 / 删除 / 拖动排序 / 批量加入） |
+| 歌单（歌单广场 + 排行榜） | ✅ 独立的「歌单」标签页：按音源分组的完整榜单库（酷狗 55 个 / QQ 25 个 / 网易云 65 个 / Apple 8 个）+ 自建歌单（新建 / 重命名 / 删除 / 拖动排序 / 批量加入） |
 | 歌词 | ✅ LRC 解析、逐行高亮滚动（逐字歌词降级为按行） |
 | 播放器 | ✅ AVPlayer 后台播放、锁屏与控制中心信息、耳机线控、来电中断恢复 |
 | 桌面版 `musicSdk` 的 kw/kg/tx/wy/mg 内置搜索接口 | ❌ **未内置**（见「已知限制」），改为 Apple 官方曲库 + 自定义 HTTP 搜索接口 |
@@ -64,15 +64,18 @@
 
 ### 歌单
 
-App 有独立的「歌单」标签页，分两块：
+「歌单」标签页顶部是**榜单来源切换**（对应桌面版左侧那个「音乐来源」下拉，这里换成了横向胶囊），下面是该来源的完整榜单列表，点进去是真实曲目，可「播放全部 / 随机播放 / 全部加入新歌单」。
 
-**推荐歌单** —— 6 个地区的 Apple Music 官方热门榜（中国大陆 / 中国香港 / 美国 / 日本 / 韩国 / 英国）。数据来自 Apple Marketing Tools 的公开 RSS：
+| 来源 | 榜单数 | 取数接口 |
+| --- | --- | --- |
+| 酷狗音乐 | 55（TOP500、飙升榜、内地榜、DJ热歌榜、网络热歌榜、说唱先锋榜…） | `m.kugou.com/rank/list` + `rank/info` |
+| QQ 音乐 | 25（巅峰榜·热歌 / 流行指数 / 新歌、国乐榜…） | `c.y.qq.com/v8/fcg-bin/fcg_myqq_toplist.fcg` + `fcg_v8_toplist_cp.fcg` |
+| 网易云音乐 | 65（飙升榜、新歌榜、原创榜、热歌榜、中文说唱榜…） | `music.163.com/api/toplist` + `api/playlist/detail` |
+| Apple 官方榜 | 8（中国大陆 / 港 / 台 / 美 / 日 / 韩 / 英 / 法） | Apple Marketing Tools RSS |
 
-```
-https://rss.applemarketingtools.com/api/v2/{storefront}/music/most-played/50/songs.json
-```
+榜单目录拉取后缓存 6 小时（Apple 是静态目录，不请求），曲目缓存 30 分钟；每个来源下胶囊上有个小圆点，绿色表示当前音源已覆盖该平台，橙色表示只能浏览、播放会提示导入。
 
-选它而不是爬某个平台的私有歌单接口，理由有三点：无需密钥、按地区天然分好、条目里的 `id` 就是 iTunes `trackId`，能直接交给音源脚本换成播放链接。点进任一榜单可以「播放全部 / 随机播放 / 全部加入新歌单」。
+关键区别：**榜单只负责「有什么歌」，播放仍然走你导入的音源脚本**。曲目会带上 `source = kg / tx / wy` 与该平台专有字段（酷狗的 `hash` / `audio_id` / `_types`，QQ 的 `songmid` / `albummid`，网易的 `songmid` / `albumName`），所以只要音源脚本声明了对应平台，点播放即可拿到完整歌曲链接；没导入对应源时会给出明确报错（而不是静默失败或错播成 Apple 试听）。
 
 **我的歌单** —— 自己建的歌单，支持新建、长按重命名、删除、拖动排序、批量加歌；封面自动用前四首的专辑图拼成 2×2。
 
@@ -81,7 +84,7 @@ https://rss.applemarketingtools.com/api/v2/{storefront}/music/most-played/50/son
 - 本地音乐列表长按 → 同样可加入
 - 榜单详情右上角菜单 →「全部加入新歌单」
 
-> 洛雪桌面版的「歌单 / 排行榜」来自内置的 kw/kg/tx/wy/mg 平台 API，那些接口本工程没有内置（涉及签名加密与合规风险，见「已知限制」）。所以这里改用 Apple 官方榜单作为推荐歌单来源，功能形态与洛雪一致，数据源不同。
+> 洛雪自定义源协议本身**不提供**榜单能力（只有 `musicUrl` / `lyric` / `pic`），桌面端的榜单来自内置 `musicSdk` 里各平台的私有接口。这里改为直接对接各平台**公开的榜单接口**，所以拿到了与桌面端同名的榜单和真实曲目；播放链路保持「App 只做播放器框架」的分工不变。Apple 官方榜保留，作为不装任何音源脚本也能播的兜底。
 
 ### 目录结构
 
@@ -100,7 +103,7 @@ LXMusic-iOS/
     ├── App/            LXMusicApp.swift、Info.plist（UIBackgroundModes=audio、ATS）
     ├── Models/         MusicInfo / Playlist / SourceCapability / Settings
     ├── Sources/        ScriptEngine、ScriptCrypto、HTTPBridge、SourceManager
-    │                   SearchProviders、ChartProvider、LocalMusicImporter
+    │                   SearchProviders、BoardProvider、LocalMusicImporter
     │                   LXPrelude.js（JS 宿主）、DemoSource.js（示例音源）
     ├── Services/       PlayerService、NowPlayingService、AudioSessionManager
     │                   LibraryStore、LyricParser
@@ -349,7 +352,8 @@ send(EVENT_NAMES.inited, {
 - **iOS 真机编译与链接已通过**：GitHub Actions（`macos-15` / Xcode 16.4 / iPhoneOS 18.5 SDK）完整构建成功，`LXMusic` 可执行文件为 `Mach-O 64-bit executable arm64`
 - **.ipa 包结构已校验**：标准 `Payload/LXMusic.app/`，含 `Info.plist`、`LXMusic`、`Assets.car`、`LXPrelude.js`、`DemoSource.js`、`AppIcon*.png`；显示名 `LX Music`、Bundle ID `com.lufanglei.lxmusic`，均为 ASCII（侧载工具创建 App ID 不会报 `appIdName` 非法）
 - 23 个 Swift 文件全部通过 `swiftc -frontend -parse` 语法解析
-- **歌单数据源做过端到端验证**：把 `ChartProvider.swift` + `MusicInfo.swift` 用 macOS SDK 单独编译成命令行程序真实运行，6 个地区榜单各返回 50 首，`songId` 与高清封面齐全；同时验证了 `hdArtwork` 对 `100x100bb` / `100x109bb` 两种尺寸片段的全局替换、跨区 `lookup` 补齐试听链接、以及 30 分钟缓存复用
+- **榜单库做过端到端验证**：把 `BoardProvider.swift` + `MusicInfo.swift` 用 macOS SDK 单独编译成命令行程序，真实请求四个来源：Apple 8 个地区榜各 50 首；酷狗目录 55 个榜、曲目 60 首（两页）；QQ 目录 25 个榜、曲目 100 首；网易云目录 65 个榜、曲目 100 首。逐条校验了歌名 / 歌手 / 时长 / 封面，以及播放必需的 `hash`、`albumId`、`_types`、`songmid`、`albummid`、`albumName` 是否已透传给音源脚本，全部通过（失败项 0）
+- 同时验证了 `hdArtwork` 对 `100x100bb` / `100x109bb` 两种尺寸片段的全局替换、跨区 `lookup` 补齐试听链接、以及榜单缓存复用
 - 跨文件 `swiftc -typecheck`（macOS SDK）：仅报 `no such module 'UIKit'`（iOS 专属模块，属预期假阳性），在可解析范围内未发现跨文件引用或类型错误
 - `project.pbxproj` 通过 `plutil -lint`，无悬空引用，23 个源文件全部进入 Sources 阶段，资源与 3 个系统框架齐全
 - 新增的 shared scheme 通过 XML 解析校验；`tools/build_ipa.sh` 通过 `bash -n`；CI 工作流 YAML 结构完整
@@ -363,7 +367,7 @@ send(EVENT_NAMES.inited, {
 - **未在 iPhone 真机安装运行、未跑模拟器**：编译与链接已在 CI 通过，但运行时行为（音源脚本执行、后台播放、锁屏控制、音频中断恢复）仍需真机验证。这是当前交付最主要的残留风险。
 - 本机仍无 Xcode / iOS SDK，无法本地编译；需要本机编译请先装 Xcode（路径 B）。
 - CI 与本机脚本产出的是**未签名** .ipa，必须经侧载工具或你自己的证书重签名才能安装。
-- 未内置桌面版 `musicSdk` 里 kw/kg/tx/wy/mg 的搜索接口：那些接口带平台私有加密签名、变动频繁且涉及版权合规，不适合原样搬进一个未签名的本地工程。需要的话请通过「自定义 HTTP 搜索接口」指向你自建的服务，或自行在 `SearchProviders.swift` 增加 Provider。
+- 榜单只接了酷狗 / QQ / 网易云三家（外加 Apple），桌面版还有 kw / mg：酷我的 `bang/bangList` 已 404、咪咕接口需要额外签名，两者都没有稳定公开入口，因此未接入。搜索框仍走 iTunes Search API，没有改造成平台搜索（改造成本与失效风险都更高）。
 - 未实现下载、多端数据同步、桌面歌词、音效均衡器、歌单分享/导入导出。
 - 搜索走 iTunes Search API 时，**`country=cn` 的接口已不返回结果**，代码里改为中文关键词自动走中国台湾 / 中国香港 / 美国区，英文走美国 / 英国区；接口对短时间高频请求会返回空结果，所以结果做了 10 分钟缓存。推荐歌单的 RSS 有两个域名，实测会交替超时，已做双域名轮换重试（最多 3 次）。
 - `XMLHttpRequest`、`Worker`、`crypto.subtle` 未提供；绝大多数音源脚本用 `lx.request` / `fetch`，如需可自行在 `LXPrelude.js` 补。
