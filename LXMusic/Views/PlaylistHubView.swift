@@ -21,6 +21,15 @@ struct PlaylistHubView: View {
                     myPlaylistsSection
                     footer
                 }
+                // 两个 alert 挂在不同的视图上：同一个视图挂多个 alert 时，iOS 只会响应最后一个
+                .alert("新建歌单", isPresented: $showNewPlaylist) {
+                    TextField("歌单名称", text: $newName)
+                    Button("取消", role: .cancel) { newName = "" }
+                    Button("创建") {
+                        library.createPlaylist(name: newName)
+                        newName = ""
+                    }
+                }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
                 .padding(.bottom, 120)
@@ -35,14 +44,6 @@ struct PlaylistHubView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
-                }
-            }
-            .alert("新建歌单", isPresented: $showNewPlaylist) {
-                TextField("歌单名称", text: $newName)
-                Button("取消", role: .cancel) { newName = "" }
-                Button("创建") {
-                    library.createPlaylist(name: newName)
-                    newName = ""
                 }
             }
             .alert("重命名歌单",
