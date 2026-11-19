@@ -245,8 +245,13 @@ final class SourceManager: ObservableObject {
             }
         }
         let available = capabilities[key]?.qualitys ?? []
-        var resolved = quality ?? SettingsStore.shared.preferredQuality
-        if !available.contains(resolved) { resolved = available.first }
+        // 返回类型是 (String, String?)：音质可能为空（脚本未声明 qualitys 或本地音乐）。
+        var resolved: String? = quality ?? SettingsStore.shared.preferredQuality
+        if let current = resolved {
+            if !available.contains(current) { resolved = available.first }
+        } else {
+            resolved = available.first
+        }
         if key == "local" { resolved = nil }
         return (key, resolved)
     }
